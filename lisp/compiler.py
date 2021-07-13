@@ -13,6 +13,10 @@ Exp    = (Atom, List)     # A Scheme expression is an Atom or List
 Env    = dict             # A Scheme environment (defined below) 
                           # is a mapping of {variable: value}
 
+class LispError(Exception): pass
+class LispParseError(LispError): pass
+class LispSymbolError(LispError): pass
+
 def tokenize(chars: str) -> list:
     "Convert a string of characters into a list of tokens."
     return shlex.split(
@@ -30,7 +34,7 @@ def parse(program: str) -> Exp:
 def read_from_tokens(tokens: list) -> Exp:
     "Read an expression from a sequence of tokens."
     if len(tokens) == 0:
-        raise SyntaxError('unexpected EOF')
+        raise LispParseError('unexpected EOF')
 
     token = tokens.pop(0)
 
@@ -45,9 +49,10 @@ def read_from_tokens(tokens: list) -> Exp:
         tokens.pop(0) # pop off ')'
         return L
     if token == ')':
-        raise SyntaxError('unexpected )')
+        raise LispParseError('unexpected )')
     
     return atom(token)
+
 
 def atom(token: str) -> Atom:
     "Numbers become numbers; every other token is a symbol."
@@ -58,9 +63,6 @@ def atom(token: str) -> Atom:
             return Symbol(token)
 
 ##################################
-
-
-class LispTypeError(Exception): pass
 
 class Context(dict):
     def __init__(self, parms: list, args: list, outer=None):
@@ -83,7 +85,7 @@ class Context(dict):
         except AttributeError as e:
             print(f"Coulnd't find {var}")
             breakpoint()
-            raise e
+            raise LispSymbolError(str(e))
         
 class Procedure():
     "A user-defined Scheme procedure."
@@ -208,7 +210,30 @@ def eval_free(ast: List, context: dict, debug=False):
             elif ast[0] == "list":
                 return [eval_free(el, context) for el in ast[1:]]
 
+            elif ast[0] == "curry":
+                ast = ast[1]
+                
+                num_declared_args = len(ast) - 1
 
+                symbol_eval = eval_free(ast[0], context, debug=debug)
+                function_arity = deduce_arity(
+                    symbol_eval
+                )
+
+                alfabeto = "abcdefghij"
+                new_ast = [
+                    "lambda",
+                    list(alfabeto[:function_arity-num_declared_args]),
+                    ast + list(alfabeto[:function_arity-num_declared_args])
+                ]
+                print(new_ast)
+                
+                return eval_free(
+                    new_ast,
+                    context,
+                    debug=debug
+                )
+                
             elif ast[0] == "let":   
                 # Per esempio, se ho
                 # 
@@ -286,15 +311,18 @@ def eval_free(ast: List, context: dict, debug=False):
                 if isinstance(eval_func, Procedure):
                     ast = eval_func.body
                     context = Context(eval_func.parms, eval_exprs[1:],
-                                      Context(eval_func.ctx.keys(), eval_func.ctx.values(), context))
+                                      Context(eval_func.ctx.keys(),
+                                              eval_func.ctx.values(),
+                                              context))
                 else:
                     return eval_func(*eval_exprs[1:])
 
 
-def evalS(program):
+def evalS(program, context=None):
     ast = parse(program)
-    return eval_free(ast, context_base)
-
+    if context is None:
+        return eval_free(ast, context_base)
+    return eval_free(ast, context)
 
 
 def eval_program(program, ctx=None, what_to_print=Print.ALL, debug=False, returns="ctx"):
@@ -321,7 +349,7 @@ def eval_program(program, ctx=None, what_to_print=Print.ALL, debug=False, return
             print(partial_results[-1])
         return partial_results[-1]
 
-    raise Exception(f"`returns` parameter must be either ctx or val (given: {returns}")
+    raise LispError(f"`returns` parameter must be either ctx or val (given: {returns}")
 
 ############################################
 
@@ -356,5 +384,5 @@ def repl():
 def mcirc():
     ev("(metacircular (list if-macro-checker for-macro-sub))")
     
-repl()
+# repl()
 # mcirc()

@@ -1,0 +1,50 @@
+#+TITLE: 
+#+AUTHOR: Jacopo Bolbo
+#+EMAIL: cvd00@insicuri.net
+
+#+LATEX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [a4paper]
+#+LATEX_HEADER: \input{$HOME/.emacs.d/latex-preamble.tex}
+
+* Not urgent
+** Currying
+
+#+begin_src
+(map (map *2) (list (list 1) (list 2) (list 3)))
+#+end_src
+
+Questa espressione per ora non compila, l'errore è:
+
+#+begin_example
+(...)
+File "/home/interscambio/fittone/lisp/lisp/compiler.py", line 295, in eval_free
+    return eval_func(*eval_exprs[1:])
+
+TypeError: <lambda>() missing 1 required positional argument: 'l'
+#+end_example
+
+Questo tradotto vuol dire: (map *2) non è una funzione, è un'espressione sintattica senza senso. Se la cambiassimo in:
+
+#+begin_src 
+(map (lambda (l) (map *2 l))
+     (list (list 1) (list 2) (list 3)))
+
+  = [[2], [4], [6]]
+#+end_src
+
+Tutto funziona come da regola.
+
+Si può implementare il currying? O richiede modifiche troppo profonde?
+
+*** Risposta: meglio non farlo
+
+Vedi [[https://stackoverflow.com/questions/11218905/is-it-possible-to-implement-auto-currying-to-the-lisp-family-languages]]
+
+È complicato perché poi il parsing diventa indecidibile: un'espressione come
+
+(list 1 2 3 4) è:
+
+- (list 1 2 3)(4)
+- (list 1 2)(3)(4)
+- (list) (1)(2)(3)(4)
+- ...?

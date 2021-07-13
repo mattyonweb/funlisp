@@ -27,3 +27,10 @@ class Print(enum.Enum):
     NOTHING = 0
     FINAL = 1
     ALL = 2
+
+##########################################
+import inspect
+
+def deduce_arity(foo: Callable) -> int:
+    sig = inspect.signature(foo)
+    return len(sig.parameters)
