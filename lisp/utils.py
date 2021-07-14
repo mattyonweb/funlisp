@@ -37,3 +37,26 @@ def deduce_arity(foo: Callable) -> int:
     
     sig = inspect.signature(foo)
     return len(sig.parameters)
+
+###########################################
+
+def replace_but_not_inside_quotes(old: chr, new: chr, s: str) -> str:
+    new_s = str()
+    in_quotes = False
+    
+    for c in s:
+        if c == "\"":
+            in_quotes = not in_quotes
+            new_s += c
+            continue
+
+        if c == old:
+            if not in_quotes:
+                new_s += new
+            else:
+                new_s += c
+            continue
+
+        new_s += c
+                
+    return new_s

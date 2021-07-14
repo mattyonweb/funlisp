@@ -20,9 +20,9 @@ class LispSymbolError(LispError): pass
 def tokenize(chars: str) -> list:
     "Convert a string of characters into a list of tokens."
     return shlex.split(
-        chars.replace('(', ' ( ')
-             .replace(')', ' ) ')
-             .replace("'", " ` "),
+        replace_but_not_inside_quotes('(', ' ( ',
+        replace_but_not_inside_quotes(')', ' ) ',
+        replace_but_not_inside_quotes("'", " ` ", chars))),
         posix=False
     )
             
@@ -89,8 +89,9 @@ class Context(dict):
         
 class Procedure():
     "A user-defined Scheme procedure."
-    def __init__(self, parms, body, ctx, debug=False):
+    def __init__(self, parms, body, ctx, _help=None, debug=False):
         self.parms, self.body, self.ctx = parms, body, ctx
+        self.help = None if _help is None else eval_free(_help, ctx, debug=debug)
         self.debug = debug
     def __call__(self, *args):
         return eval_free(self.body, Context(self.parms, args, outer=self.ctx), debug=self.debug)
@@ -99,6 +100,16 @@ class Procedure():
 ################################
 import time
 
+def print_help(foo: Union[Callable, Procedure]):
+    if isinstance(foo, Procedure):
+        if foo.help is None:
+            return False
+
+        return foo.help
+
+    return False
+    
+    
 context_base_simple = {
     "t": True,
     "nil": False,
@@ -135,6 +146,7 @@ context_base_simple = {
     "sleep": time.sleep,
     # "send": send,
 
+    "help": print_help,
     "read": lambda s: parse(input(s)),
     "read-with-macro": lambda s, m: m(parse(input(s))),
     "atom?": lambda x: isinstance(x, (int, str))
@@ -175,9 +187,18 @@ def eval_free(ast: List, context: dict, debug=False):
                 return ast[1]
 
             if ast[0] == "lambda":
-                variables = ast[1] 
-                body = ast[2]
-                return Procedure(variables, body, context, debug=debug)
+                if len(ast[1:]) == 3:
+                    variables = ast[1]
+                    _help = ast[2]
+                    body = ast[3]
+                elif len(ast[1:]) == 2:
+                    _help = None
+                    variables = ast[1] 
+                    body = ast[2]
+                else:
+                    raise LispError(f"lambda expects 2/3 arguments, were given {len(ast[1:])}")
+
+                return Procedure(variables, body, context, _help=_help, debug=debug)
 
             if ast[0] == "define":
                 context.outermost_add(ast[1], eval_free(ast[2], context)) #funziona per non-ricorsive
@@ -226,7 +247,7 @@ def eval_free(ast: List, context: dict, debug=False):
                     list(alfabeto[:function_arity-num_declared_args]),
                     ast + list(alfabeto[:function_arity-num_declared_args])
                 ]
-                breakpoint()
+                # breakpoint()
                 # print(new_ast)
                 return eval_free(
                     new_ast,

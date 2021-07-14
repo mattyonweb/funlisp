@@ -114,3 +114,6 @@ class Basics(unittest.TestCase):
         # pseudo-python: `compose(lambda x:x+1)(lambda x:x*100)(1) = 101`
         # Composition compose as always from right to left
         self.evto("(((curry (compose ++)) (lambda (x) (* x 100))) 1)", 101)
+
+    # def test_big_numbers(self):
+    #     self.evto(
