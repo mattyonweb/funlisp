@@ -10,8 +10,8 @@ class Basics(unittest.TestCase):
             what_to_print=Print.NOTHING
         )
 
-    def evto(self, expr: str, obj: Any):
-        res = evalS(expr, context=Basics.userctx)
+    def evto(self, expr: str, obj: Any, debug=False):
+        res = evalS(expr, context=Basics.userctx, debug=debug)
         self.assertEqual(res, obj)
         return res
         
@@ -115,5 +115,14 @@ class Basics(unittest.TestCase):
         # Composition compose as always from right to left
         self.evto("(((curry (compose ++)) (lambda (x) (* x 100))) 1)", 101)
 
+        
+    def test_simple_eval(self):
+        self.evto("(eval '())", [])
+        self.evto("(eval 1)", 1)
+
+        self.evto("(eval (list 1 2 3))", [1,2,3])
+        
+        
     # def test_big_numbers(self):
     #     self.evto(
+

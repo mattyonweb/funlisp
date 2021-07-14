@@ -2,10 +2,12 @@ from typing import List, Callable, Dict, Tuple,  _CallableGenericAlias
 import socket
 import shlex
 import threading
+import os
 
 from lisp.utils import *
 
-Symbol = str              # A Scheme Symbol is implemented as a Python str
+class Symbol(str): pass
+
 Number = (int, float)     # A Scheme Number is implemented as a Python int or float
 Atom   = (Symbol, Number) # A Scheme Atom is a Symbol or Number
 List   = list             # A Scheme List is implemented as a Python list
@@ -60,6 +62,9 @@ def atom(token: str) -> Atom:
     except ValueError:
         try: return float(token)
         except ValueError:
+            # if token[0] == "\"":
+            #     return ["string", token] #TODO?
+            # else:
             return Symbol(token)
 
 ##################################
@@ -84,8 +89,7 @@ class Context(dict):
             return self[var] if (var in self) else self.outer.find(var)
         except AttributeError as e:
             print(f"Coulnd't find {var}")
-            breakpoint()
-            raise LispSymbolError(str(e))
+            raise LispSymbolError(str(e)) from e
         
 class Procedure():
     "A user-defined Scheme procedure."
@@ -156,7 +160,8 @@ context_base_simple = {
     "pwd": os.getcwd(),
     "read-file": read_file,
     "write-file": write_file,
-    
+
+    "type?": type,
     "atom?": lambda x: isinstance(x, (int, str)) # TODO: str può essere stringa o simbolo!
 }
 
@@ -173,19 +178,28 @@ def ast_to_str(ast: List) -> str:
 
     return f"({ast[0]} " + " ".join(ast_to_str(x) for x in ast[1:]) + ")"
 
+import logging
+
+logger = logging.getLogger("[EVAL]")
 
 def eval_free(ast: List, context: dict, debug=False):
     while True:
-        if debug: print(ast)
-
-        if isinstance(ast, (int, float)):
-            return ast
+        # print(ast)
+        
+        if debug:
+            print(ast)
 
         if isinstance(ast, Symbol):
             return context.find(ast)
 
-        if isinstance(ast, list): #bug: e empty list?
-            if len(ast) == 0:
+        if isinstance(ast, (int, float)): #TODO: ma era questo?
+            return ast
+
+        if isinstance(ast, str): #TODO: ma era questo?
+            return ast
+
+        if isinstance(ast, list):
+            if len(ast) == 0: # '() o (list)
                 return []
 
             if ast[0] == "quote":
@@ -194,6 +208,9 @@ def eval_free(ast: List, context: dict, debug=False):
             if ast[0] == "string":
                 return ast[1]
 
+            elif ast[0] == "list":
+                return [eval_free(el, context, debug=debug) for el in ast[1:]]
+            
             if ast[0] == "lambda":
                 if len(ast[1:]) == 3:
                     variables = ast[1]
@@ -209,23 +226,22 @@ def eval_free(ast: List, context: dict, debug=False):
                 return Procedure(variables, body, context, _help=_help, debug=debug)
 
             if ast[0] == "define":
-                context.outermost_add(ast[1], eval_free(ast[2], context)) #funziona per non-ricorsive
-                # context.add(ast[1], eval_free(ast[2], context)) #funziona per non-ricorsive
+                #funziona per non-ricorsive
+                context.outermost_add(ast[1], eval_free(ast[2], context, debug=debug)) 
                 return ast[1]
 
             if ast[0] == "cond":
                 for clause in ast[1:]:
-                    if eval_free(clause[0], context):
-                        # breakpoint()
+                    if eval_free(clause[0], context, debug=debug):
                         ast = clause[1]
                         break
                 else:
-                    assert eval_free(ast[-1][0], context), f"{ast[-1][0]} should evaluate to T!"
+                    assert eval_free(ast[-1][0], context, debug=debug), f"{ast[-1][0]} should evaluate to T!"
                     print("WARNING")
                     return 
 
             elif ast[0] == "if":
-                if eval_free(ast[1], context):
+                if eval_free(ast[1], context, debug=debug):
                     ast = ast[2]
                 else:
                     ast = ast[3]
@@ -233,11 +249,8 @@ def eval_free(ast: List, context: dict, debug=False):
             elif ast[0] == "begin":
                 for x in ast[1:-1]:
                     print("EVAL: ", x)
-                    eval_free(x, context)
+                    eval_free(x, context, debug=debug)
                 ast = ast[-1]
-
-            elif ast[0] == "list":
-                return [eval_free(el, context) for el in ast[1:]]
 
             elif ast[0] == "curry":
                 ast = ast[1]
@@ -252,16 +265,16 @@ def eval_free(ast: List, context: dict, debug=False):
                 alfabeto = "abcdefghij"
                 new_ast = [
                     "lambda",
-                    list(alfabeto[:function_arity-num_declared_args]),
-                    ast + list(alfabeto[:function_arity-num_declared_args])
+                    [Symbol(c) for c in alfabeto[:function_arity-num_declared_args]],
+                    ast + [Symbol(c) for c in alfabeto[:function_arity-num_declared_args]]
                 ]
                 # breakpoint()
-                # print(new_ast)
-                return eval_free(
-                    new_ast,
-                    context,
-                    debug=debug
-                )
+                ast = new_ast
+                # return eval_free(
+                #     new_ast,
+                #     context,
+                #     debug=debug
+                # )
                 
             elif ast[0] == "let":   
                 # Per esempio, se ho
@@ -276,7 +289,7 @@ def eval_free(ast: List, context: dict, debug=False):
                 if MULTI_LET:
                     for let_clause in ast[1]:
 
-                        let_clause_body = eval_free(let_clause[1], inner_ctx)
+                        let_clause_body = eval_free(let_clause[1], inner_ctx, debug=debug)
 
                         # Se il corpo del let-rec è effettivamente una procedura (e non
                         # ad es. un numero), essa potrebbe essere ricorsiva.
@@ -289,7 +302,7 @@ def eval_free(ast: List, context: dict, debug=False):
                         inner_ctx.add(let_clause[0], let_clause_body)
 
                 else:
-                    let_clause_body = eval_free(ast[2], inner_ctx)
+                    let_clause_body = eval_free(ast[2], inner_ctx, debug=debug)
 
                     if isinstance(let_clause_body, Procedure):
                         let_clause_body.ctx.add(ast[1], let_clause_body)
@@ -324,11 +337,16 @@ def eval_free(ast: List, context: dict, debug=False):
                     return "ok"
 
             elif ast[0] == "eval":
+                # ast = eval_free(ast[1], context, debug=debug)
+                return eval_free(ast[1], context, debug=debug)
+                
+            elif ast[0] == "evalS":
                 if ast[1][0] == "string":
                     ast = eval_free(atom(ast[1][1]), context, debug=debug)
                 else:
-                    ast = eval_free(ast[1], context, debug=debug)
-
+                    s = eval_free(ast[1], context, debug=debug)
+                    ast = ["evalS", s]
+                    
             elif ast[0] == "print":
                 eval_body = eval_free(ast[1], context, debug=debug)
                 print(eval_body)
@@ -336,8 +354,8 @@ def eval_free(ast: List, context: dict, debug=False):
 
             else:
                 eval_exprs = [eval_free(piece, context, debug=debug) for piece in ast]
-                if debug:
-                    breakpoint()
+                # if debug:
+                #     breakpoint()
                 eval_func  = eval_exprs[0]
 
                 if isinstance(eval_func, Procedure):
@@ -349,12 +367,15 @@ def eval_free(ast: List, context: dict, debug=False):
                 else:
                     return eval_func(*eval_exprs[1:])
 
+        else:
+            raise LispError("Unknwown type")
 
-def evalS(program, context=None):
+
+def evalS(program, context=None, debug=False):
     ast = parse(program)
     if context is None:
-        return eval_free(ast, context_base)
-    return eval_free(ast, context)
+        return eval_free(ast, context_base, debug=debug)
+    return eval_free(ast, context, debug=debug)
 
 
 def eval_program(program, ctx=None, what_to_print=Print.ALL, debug=False, returns="ctx"):
@@ -385,15 +406,15 @@ def eval_program(program, ctx=None, what_to_print=Print.ALL, debug=False, return
 
 ############################################
 
-assert evalS("()") == []
-assert evalS("1") == 1
-assert evalS("-1") == -1
-assert evalS("(+ 1 2)") == 3
-assert evalS("'(3 1 2)") == [3,1,2]
-assert evalS(" '(3 1 2)") == [3,1,2]
-# assert evalS("(map ++ '(1 2 3))") == [2,3,4]
-assert evalS("((compose ++ *2) 1)") == 3
-assert evalS("(let ((h (+ 1 2))) (list 1 2 h))") == [1,2,3]
+# assert evalS("()") == []
+# assert evalS("1") == 1
+# assert evalS("-1") == -1
+# assert evalS("(+ 1 2)") == 3
+# assert evalS("'(3 1 2)") == [3,1,2]
+# assert evalS(" '(3 1 2)") == [3,1,2]
+# # assert evalS("(map ++ '(1 2 3))") == [2,3,4]
+# assert evalS("((compose ++ *2) 1)") == 3
+# assert evalS("(let ((h (+ 1 2))) (list 1 2 h))") == [1,2,3]
 
 import readline
 
@@ -402,19 +423,21 @@ def ev(program: str, what_to_print=Print.ALL, returns="ctx"):
     userctx = eval_program(user_library, what_to_print=what_to_print)
     return eval_program(program, userctx, what_to_print=what_to_print, returns=returns)
     
-def repl():
+def repl(debug=False):
     import traceback
     
     userctx = ev("", what_to_print=Print.FINAL)
     while (inp := input("λ ")) != "q":
         try:
-            eval_program(inp, userctx, what_to_print=Print.ALL)
-        except Exception:
+            eval_program(inp, userctx, what_to_print=Print.ALL, debug=debug)
+        except Exception as e:
+            print(e)
+            print("PORCODIO")
             print(traceback.format_exc())
 
 
 def mcirc():
     ev("(metacircular (list if-macro-checker for-macro-sub))")
     
-repl()
+# repl()
 # mcirc()
