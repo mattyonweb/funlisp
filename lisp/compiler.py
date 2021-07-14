@@ -21,8 +21,8 @@ def tokenize(chars: str) -> list:
     "Convert a string of characters into a list of tokens."
     return shlex.split(
         replace_but_not_inside_quotes('(', ' ( ',
-        replace_but_not_inside_quotes(')', ' ) ',
-        replace_but_not_inside_quotes("'", " ` ", chars))),
+          replace_but_not_inside_quotes(')', ' ) ',
+            replace_but_not_inside_quotes("'", " ` ", chars))),
         posix=False
     )
             
@@ -108,7 +108,13 @@ def print_help(foo: Union[Callable, Procedure]):
         return foo.help
 
     return False
-    
+
+def read_file(fpath: str) -> str:
+    with open(fpath, "r") as f:
+        return ["string", f.read()]
+def write_file(fpath: str, data: str) -> str:
+    with open(fpath, "w") as f:
+        return f.write(data)
     
 context_base_simple = {
     "t": True,
@@ -140,16 +146,18 @@ context_base_simple = {
     "is-list?": lambda x: isinstance(x, list),
 
     "compose": lambda f1, f2: lambda x: f1 ( f2 (x)),
-    # "map": lambda f, l: [f(x) for x in l],
 
-    # "listen": listen,
     "sleep": time.sleep,
-    # "send": send,
-
     "help": print_help,
+    
     "read": lambda s: parse(input(s)),
     "read-with-macro": lambda s, m: m(parse(input(s))),
-    "atom?": lambda x: isinstance(x, (int, str))
+
+    "pwd": os.getcwd(),
+    "read-file": read_file,
+    "write-file": write_file,
+    
+    "atom?": lambda x: isinstance(x, (int, str)) # TODO: str può essere stringa o simbolo!
 }
 
 context_base = Context(context_base_simple.keys(), context_base_simple.values())
@@ -316,7 +324,10 @@ def eval_free(ast: List, context: dict, debug=False):
                     return "ok"
 
             elif ast[0] == "eval":
-                ast = eval_free(ast[1], context, debug=debug)
+                if ast[1][0] == "string":
+                    ast = eval_free(atom(ast[1][1]), context, debug=debug)
+                else:
+                    ast = eval_free(ast[1], context, debug=debug)
 
             elif ast[0] == "print":
                 eval_body = eval_free(ast[1], context, debug=debug)
@@ -405,5 +416,5 @@ def repl():
 def mcirc():
     ev("(metacircular (list if-macro-checker for-macro-sub))")
     
-# repl()
+repl()
 # mcirc()

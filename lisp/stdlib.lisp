@@ -1,65 +1,84 @@
 (define err-empty-list 'err-empty-list)
 			
 ;; Checks if list is empty
-(define empty-list?
-  (lambda (l)
-    ;; (= l ())))
-    (if (= l ()) t nil)))
+(define empty-list?  
+  (lambda (l) "Checks if a list is empty." (= l '())))
+
 
 (define map
-  (let map-rec
+  (let map-rec (lambda (f l acc)
+		 (if (empty-list? l) acc
+		     (map-rec f (tail l) (append (f (nth l 0)) acc))))
+
+       (lambda (f l) "A classic higher order map over a list."
+	 (map-rec f l '()))))
+
+
+(define filter
+  (let filter-rec
     (lambda (f l acc)
       (if (empty-list? l) acc
-	  (map-rec f (tail l) (append (f (nth l 0)) acc))))
-    (lambda (f l) (map-rec f l '()))))
+	  (let hd (nth l 0)
+	       (filter-rec f (tail l)
+			   (if (f hd) (append hd acc) acc)))))
 
-;; Length function for lists
+    (lambda (f l) "A classic higher order filter over a list."
+      (filter-rec f l '()))))
+
+
 (define length 
-  ;; Helper for memoization
-    (let ((length-tailrec (lambda (l sum)
-			    (if (empty-list? l) sum
-				(length-tailrec (tail l) (+ sum 1))))))
-    (lambda (l) (length-tailrec l 0))))
+    (let length-tailrec
+      (lambda (l sum)
+	(if (empty-list? l) sum
+	    (length-tailrec (tail l) (+ sum 1))))
+      
+      (lambda (l) "Length of a list." (length-tailrec l 0))))
 
 
 ;; Reverse a list
 (define reverse
   (let reverse-rec (lambda (l acc)
-      (if (empty-list? l) acc
-          (reverse-rec (tail l) (cons (head l) acc))))
-   (lambda (l) (reverse-rec l ())))) 
-     
+		     (if (empty-list? l) acc
+			 (reverse-rec (tail l) (cons (head l) acc))))
 
-(define accumulate
-    (lambda (foos x)
-      (cond ((empty-list? foos) x)
-	    (t (accumulate (tail foos) ((head foos) x))))))
+       (lambda (l) "Reverses a list."
+	 (reverse-rec l '()))))
       
     
 ;; nth element of a list
 (define nth
-  (lambda (l n)
+  (lambda (l n) "Returns nth element of a list." 
     (cond ((empty-list? l) 'err-empty-list)
           ((= n 0) (head l))
           (t (nth (tail l) (- n 1))))))
 
+
 ;; last element of a list
 (define last
-  (lambda (l) (nth l (- (length l) 1))))
+  (lambda (l) "Returns last element of a list."
+    (nth l (- (length l) 1))))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Ritorna una lista dei primi n numeri di Fibonacci
-(define fast-fibo-list
+
+(define lucas-list
   (lambda (n memo)
     (if (> n (length memo))
-      (fast-fibo-list n 
-                (cons (+ (nth memo 0) (nth memo 1)) memo))
-      memo)))
+	(lucas-list n 
+                    (cons (+ (nth memo 0) (nth memo 1)) memo))
+	memo)))
 
-(define fast-fibo-general
-  (lambda (n memo) (head (fast-fibo-list n memo))))
 
-(define fast-fibo
-  (lambda (n) (fast-fibo-general n (list 1 1))))
+(define lucas
+   (lambda (n memo) "Generates the nth Lucas number, given a starting list."
+      (head (lucas-list n memo))))
+
+
+(define fibo
+  (lambda (n) "Generates the nth fibonacci number."
+     (lucas n '(1 1))))
+
 
 ;; Seq from to
 (define seq
@@ -68,6 +87,7 @@
       (if (>= start end) acc
           (seq-rec (+ 1 start) end (append start acc))))
     (lambda (start end) (seq-rec start end ()))))
+
 
 (define zip 
  (let zip-rec 
@@ -127,6 +147,11 @@
 	    (map for-macro-sub E)))))
 
 ;;;;;;;;;;;;
+
+(define accumulate
+    (lambda (foos x)
+      (cond ((empty-list? foos) x)
+	    (t (accumulate (tail foos) ((head foos) x))))))
 
 (define metacircular
   (lambda (macros-list)
