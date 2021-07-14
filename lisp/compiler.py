@@ -3,6 +3,7 @@ import socket
 import shlex
 import threading
 import os
+import random
 
 from lisp.utils import *
 
@@ -119,6 +120,16 @@ def read_file(fpath: str) -> str:
 def write_file(fpath: str, data: str) -> str:
     with open(fpath, "w") as f:
         return f.write(data)
+
+def get_type(obj):
+    if isinstance(obj, (int, float)):
+        return Symbol("number")
+    if isinstance(obj, Symbol):
+        return Symbol("symbol")
+    if isinstance(obj, str):
+        return Symbol("string")
+    if isinstance(obj, list):
+        return Symbol("lst")
     
 context_base_simple = {
     "t": True,
@@ -126,7 +137,6 @@ context_base_simple = {
     "and": (lambda x, y: x and y),
     "or": (lambda x, y: x or y),
     "not": (lambda x: not x),
-    "->": (lambda x, y: (not x) or y),
 
     "=": (lambda x, y: x == y),
     "!=": (lambda x, y: x != y),
@@ -152,6 +162,7 @@ context_base_simple = {
     "compose": lambda f1, f2: lambda x: f1 ( f2 (x)),
 
     "sleep": time.sleep,
+    "random": random.randint,
     "help": print_help,
     
     "read": lambda s: parse(input(s)),
@@ -161,7 +172,7 @@ context_base_simple = {
     "read-file": read_file,
     "write-file": write_file,
 
-    "type?": type,
+    "type?": get_type,
     "atom?": lambda x: isinstance(x, (int, str)) # TODO: str può essere stringa o simbolo!
 }
 
@@ -263,18 +274,12 @@ def eval_free(ast: List, context: dict, debug=False):
                 )
 
                 alfabeto = "abcdefghij"
-                new_ast = [
+                ast = [
                     "lambda",
                     [Symbol(c) for c in alfabeto[:function_arity-num_declared_args]],
                     ast + [Symbol(c) for c in alfabeto[:function_arity-num_declared_args]]
                 ]
-                # breakpoint()
-                ast = new_ast
-                # return eval_free(
-                #     new_ast,
-                #     context,
-                #     debug=debug
-                # )
+
                 
             elif ast[0] == "let":   
                 # Per esempio, se ho
@@ -342,7 +347,8 @@ def eval_free(ast: List, context: dict, debug=False):
                 
             elif ast[0] == "evalS":
                 if ast[1][0] == "string":
-                    ast = eval_free(atom(ast[1][1]), context, debug=debug)
+                    # ast = eval_free(parse(ast[1][1]), context, debug=debug)
+                    return eval_free(parse(ast[1][1]), context, debug=debug)
                 else:
                     s = eval_free(ast[1], context, debug=debug)
                     ast = ["evalS", s]
@@ -406,16 +412,6 @@ def eval_program(program, ctx=None, what_to_print=Print.ALL, debug=False, return
 
 ############################################
 
-# assert evalS("()") == []
-# assert evalS("1") == 1
-# assert evalS("-1") == -1
-# assert evalS("(+ 1 2)") == 3
-# assert evalS("'(3 1 2)") == [3,1,2]
-# assert evalS(" '(3 1 2)") == [3,1,2]
-# # assert evalS("(map ++ '(1 2 3))") == [2,3,4]
-# assert evalS("((compose ++ *2) 1)") == 3
-# assert evalS("(let ((h (+ 1 2))) (list 1 2 h))") == [1,2,3]
-
 import readline
 
 def ev(program: str, what_to_print=Print.ALL, returns="ctx"):
@@ -432,7 +428,6 @@ def repl(debug=False):
             eval_program(inp, userctx, what_to_print=Print.ALL, debug=debug)
         except Exception as e:
             print(e)
-            print("PORCODIO")
             print(traceback.format_exc())
 
 

@@ -29,7 +29,7 @@ setup(
     ],
     packages=find_packages(),
     install_requires=[
-        # external libraries to automatically download before a pip-install
+        "regex", "hypothesis"
     ],
     include_package_data=True, #TODO?
     # cmdclass={ #specifica azioni da intraprendere post-installazione

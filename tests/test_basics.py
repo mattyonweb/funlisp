@@ -10,24 +10,39 @@ class Basics(unittest.TestCase):
             what_to_print=Print.NOTHING
         )
 
-    def evto(self, expr: str, obj: Any, debug=False):
-        res = evalS(expr, context=Basics.userctx, debug=debug)
+    def eval(self, expr: str, debug=False):
+        return evalS(expr, context=Basics.userctx, debug=debug)
+
+    
+    def evto(self, expr: str, obj: Any, debug=False, note:str=None):
+        res = self.eval(expr, debug=debug)
         self.assertEqual(res, obj)
+
+        if note:
+            print()
+            print(f"{expr}  = {res}")
+            print(f"Explanation: {note}")            
+
         return res
-        
+
+    
     def compileError(self, expr,
-                     exception_types: Union[Exception, Tuple]=None):
+                     exception_types: Union[Exception, Tuple]=None,
+                     note:str=None):
         try:
             evalS(expr, context=Basics.userctx)
         except Exception as e:
             if exception_types is None:
                 self.assertTrue(True)
-                return
-            if isinstance(e, exception_types):
+            elif isinstance(e, exception_types):
                 self.assertTrue(True)
-                return
+            else:
+                raise e
 
-            raise e
+            if note is not None:
+                print()
+                print(f"{expr} raises {e}")
+                print(f"Explanation: {note}")
         
     def test_no_expressions(self):
         self.evto("()", [])
@@ -71,6 +86,7 @@ class Basics(unittest.TestCase):
         self.evto("'(3 1 2)", [3,1,2])
         self.evto("(list 3 1 2)", [3,1,2])
 
+        
     def test_nested_lists(self):
         # Whenever you deal with nested list, use `(list <...>)`.
         # Notation '(<...>) will not work because /EVERYTHING/ inside
@@ -83,6 +99,15 @@ class Basics(unittest.TestCase):
         # More nested
         self.evto("(list 3 (list 1 (list 5 4)) 2)",
                   [3, [1, [5,4]], 2])
+
+        # Notation '(elem1 elem2 ...) is not the best idea, as elements
+        # inside the list are not evaluated
+        self.evto("'(1 '(2 3) 4)",
+                  [1, ["quote", [2, 3]], 4])
+
+        # Even more so, another example of why avoid quote notation for lists
+        self.evto("'(1 (+ 2 3) 4)",
+                  [1, ["+", 2, 3], 4])
 
 
     def test_equiv_quote_list(self):
@@ -115,14 +140,55 @@ class Basics(unittest.TestCase):
         # Composition compose as always from right to left
         self.evto("(((curry (compose ++)) (lambda (x) (* x 100))) 1)", 101)
 
-        
     def test_simple_eval(self):
         self.evto("(eval '())", [])
         self.evto("(eval 1)", 1)
 
+        self.compileError(
+            "(eval (list 1 2 3))", TypeError,
+            "The expression (1 2 3) reads 1 as a function!"
+        )
+        self.compileError(
+            "(eval '(1 2 3))", TypeError,
+            "The expression (1 2 3) reads 1 as a function!"
+        )
+        
         self.evto("(eval (list 1 2 3))", [1,2,3])
+
+        # (eval (quote X)) = X
+        # Attenzione: diverso da dire (eval (quote X)) = (eval X)!
+        self.evto("(eval '(list 1 2 3))", ["list", 1,2,3])
+        self.evto("(eval (quote (list 1 2 3)))", ["list", 1,2,3])
+
+        self.evto("(eval (list 1 (+ 1 2) 4))", [1,3,4])
+        self.evto("(eval '(list 1 (+ 1 2) 4))", ["list", 1, ["+", 1, 2], 4])
+
         
+    def test_evalS(self):
+        self.evto("""(+ (evalS "(+ 99 1)") 1)""", 101)
+        self.evto("""(+ (evalS (read-file "tests/sample.file")) 1)""", 21)
+
+        # TODO: PBT
+        self.evto(
+            """(evalS "(eval '(list 1 2 3))")""",
+            self.eval("(eval '(list 1 2 3))")
+        )
+
         
-    # def test_big_numbers(self):
-    #     self.evto(
+    def test_simple_let(self):
+        self.evto("(let x 0 (+ x 1))", 1, note="Single let")
+
+        # Multiple-let 
+        self.evto("(let ((x 0) (y 1)) (+ x y))", 1, note="Multiple let")
+
+        self.evto("(let ((h (+ 1 2))) (list 1 2 h))", [1,2,3])
+
+        self.evto("(let ((h 1) (x (+ h 1))) x)", 2, note="Mutually binding let")
+
+        
+    def test_recursive_let(self):
+        self.evto(
+            "(let foo (lambda (x) (if (< x 0) 0 (foo (- x 1)))) (foo 5))",
+            0
+        )        
 
