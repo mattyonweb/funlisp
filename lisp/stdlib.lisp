@@ -6,6 +6,12 @@
     ;; (= l ())))
     (if (= l ()) t nil)))
 
+(define map
+  (let map-rec
+    (lambda (f l acc)
+      (if (empty-list? l) acc
+	  (map-rec f (tail l) (append (f (nth l 0)) acc))))
+    (lambda (f l) (map-rec f l '()))))
 
 ;; Length function for lists
 (define length 

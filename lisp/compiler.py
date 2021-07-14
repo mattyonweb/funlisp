@@ -129,7 +129,7 @@ context_base_simple = {
     "is-list?": lambda x: isinstance(x, list),
 
     "compose": lambda f1, f2: lambda x: f1 ( f2 (x)),
-    "map": lambda f, l: [f(x) for x in l],
+    # "map": lambda f, l: [f(x) for x in l],
 
     # "listen": listen,
     "sleep": time.sleep,
@@ -226,7 +226,8 @@ def eval_free(ast: List, context: dict, debug=False):
                     list(alfabeto[:function_arity-num_declared_args]),
                     ast + list(alfabeto[:function_arity-num_declared_args])
                 ]
-                
+                breakpoint()
+                # print(new_ast)
                 return eval_free(
                     new_ast,
                     context,
@@ -358,7 +359,7 @@ assert evalS("-1") == -1
 assert evalS("(+ 1 2)") == 3
 assert evalS("'(3 1 2)") == [3,1,2]
 assert evalS(" '(3 1 2)") == [3,1,2]
-assert evalS("(map ++ '(1 2 3))") == [2,3,4]
+# assert evalS("(map ++ '(1 2 3))") == [2,3,4]
 assert evalS("((compose ++ *2) 1)") == 3
 assert evalS("(let ((h (+ 1 2))) (list 1 2 h))") == [1,2,3]
 

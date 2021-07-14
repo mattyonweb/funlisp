@@ -32,5 +32,8 @@ class Print(enum.Enum):
 import inspect
 
 def deduce_arity(foo: Callable) -> int:
+    if foo.__class__.__name__ == "Procedure":
+        return len(foo.parms)
+    
     sig = inspect.signature(foo)
     return len(sig.parameters)
