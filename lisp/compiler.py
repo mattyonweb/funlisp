@@ -226,7 +226,6 @@ def eval_free(ast: List, context: dict, debug=False):
                     list(alfabeto[:function_arity-num_declared_args]),
                     ast + list(alfabeto[:function_arity-num_declared_args])
                 ]
-                print(new_ast)
                 
                 return eval_free(
                     new_ast,

@@ -99,8 +99,18 @@ class Basics(unittest.TestCase):
             
     def test_higher_order_funcs_list(self):
         self.evto("(map ++ (list 1 2 3))", [2,3,4])
-        self.evto("(map (map ++) (list (list 1) (list 2 4) (list 3)))",
-                  [[2], [3,5], [4]])
+        self.evto(
+            "(map (lambda (x) (map ++ x)) (list (list 1) (list 2 4) (list 3)))",
+            [[2], [3,5], [4]]
+        )
         
-        self.evto("((compose ++ *2) 1)", 3)
-        self.evto("(let ((h (+ 1 2))) (list 1 2 h))", [1,2,3])
+        
+    def test_basic_currying(self):
+        self.evto(
+            "(map (curry (map ++)) (list (list 1) (list 2)))",
+            [[2],[3]]
+        )
+
+        # pseudo-python: `compose(lambda x:x+1)(lambda x:x*100)(1) = 101`
+        # Composition compose as always from right to left
+        self.evto("(((curry (compose ++)) (lambda (x) (* x 100))) 1)", 101)
