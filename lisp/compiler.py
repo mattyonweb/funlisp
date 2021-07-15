@@ -74,6 +74,11 @@ class Context(dict):
     def __init__(self, parms: list, args: list, outer=None):
         self.update(zip(parms, args))
         self.outer = outer
+
+    def depth(self, acc=0):
+        if self.outer is None:
+            return acc
+        return self.outer.depth(acc=acc+1)
         
     def add(self, k, v):
         self.update(zip([k], [v]))
@@ -120,7 +125,12 @@ def read_file(fpath: str) -> str:
 def write_file(fpath: str, data: str) -> str:
     with open(fpath, "w") as f:
         return f.write(data)
-
+def append_to_file(fpath:str, data: str):
+    with open(fpath, "a") as f:
+        return f.write(data)    
+def import_func(fpath):
+    pass # TODO
+    
 def get_type(obj):
     if isinstance(obj, (int, float)):
         return Symbol("number")
@@ -130,7 +140,17 @@ def get_type(obj):
         return Symbol("string")
     if isinstance(obj, list):
         return Symbol("lst")
-    
+
+def foldl(func, acc, l):
+    for x in l:
+        acc = func(x, acc)
+    return acc
+def repeat_until(func, acc, cond):
+    while not cond(acc):
+        acc = func(acc)
+    return acc
+
+import functools, operator as op
 context_base_simple = {
     "t": True,
     "nil": False,
@@ -145,35 +165,46 @@ context_base_simple = {
     "<=": (lambda x, y: x <= y),
     "<": (lambda x, y: x < y),
 
-    "+": (lambda x,y: x+y),
+    # "+": (lambda *ns: sum(ns)),
+    "+": (lambda *ns: functools.reduce(op.add, ns)),
     "-": (lambda x,y: x-y),
-    "*": (lambda x,y: x*y),
+    "*": (lambda *ns: functools.reduce(op.mul, ns)),
+    "**": (lambda x,y: x**y),
     "++": (lambda x: x+1),
     "*2": (lambda x: x*2),
     "mod": (lambda x,y: x % y),
     "/": (lambda x,y: x / y),
 
     "cons": lambda x,xs: [x] + xs,
-    "head": lambda xs: "err-empty-list" if len(xs) == 0 else xs[0],
+    "head": lambda xs: Symbol("err-empty-list") if len(xs) == 0 else xs[0],
     "tail": lambda xs: xs[1:],
     "append": lambda x,xs: xs + [x],
+    "nth": lambda l, n: l[n] if 0 <= n <= len(l) else Symbol("err-empty-list"),
     "is-list?": lambda x: isinstance(x, list),
 
     "compose": lambda f1, f2: lambda x: f1 ( f2 (x)),
-
+    
+    "map": lambda f,l: [f(x) for x in l],
+    "fold": foldl,
+    "repeat-until": repeat_until,
+    
+    "time": time.time,
     "sleep": time.sleep,
     "random": random.randint,
     "help": print_help,
+    "import": import_func,
     
     "read": lambda s: parse(input(s)),
     "read-with-macro": lambda s, m: m(parse(input(s))),
+    "show": lambda x: str(x),
 
     "pwd": os.getcwd(),
     "read-file": read_file,
     "write-file": write_file,
+    "append-to-file": append_to_file,
 
     "type?": get_type,
-    "atom?": lambda x: isinstance(x, (int, str)) # TODO: str può essere stringa o simbolo!
+    "atom?": lambda x: isinstance(x, (int, float, str, Symbol)) # TODO: str può essere stringa o simbolo!
 }
 
 context_base = Context(context_base_simple.keys(), context_base_simple.values())
@@ -213,6 +244,8 @@ def eval_free(ast: List, context: dict, debug=False):
             if len(ast) == 0: # '() o (list)
                 return []
 
+            # print(f"DEPTH: {context.depth()}")
+                
             if ast[0] == "quote":
                 return ast[1]
 
@@ -259,7 +292,6 @@ def eval_free(ast: List, context: dict, debug=False):
 
             elif ast[0] == "begin":
                 for x in ast[1:-1]:
-                    print("EVAL: ", x)
                     eval_free(x, context, debug=debug)
                 ast = ast[-1]
 
@@ -419,10 +451,16 @@ def ev(program: str, what_to_print=Print.ALL, returns="ctx"):
     userctx = eval_program(user_library, what_to_print=what_to_print)
     return eval_program(program, userctx, what_to_print=what_to_print, returns=returns)
     
-def repl(debug=False):
+def repl(debug=False, fpath=None):
     import traceback
-    
-    userctx = ev("", what_to_print=Print.FINAL)
+
+    if fpath is not None:
+        with open(fpath, "r") as f:
+            readed = f.read()
+    else:
+        readed = ""
+        
+    userctx = ev(readed, what_to_print=Print.FINAL)
     while (inp := input("λ ")) != "q":
         try:
             eval_program(inp, userctx, what_to_print=Print.ALL, debug=debug)

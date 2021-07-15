@@ -4,53 +4,29 @@
 (define empty-list?  
   (lambda (l) "Checks if a list is empty." (= l '())))
 
-
-(define map
-  (let map-rec (lambda (f l acc)
-		 (if (empty-list? l) acc
-		     (map-rec f (tail l) (append (f (nth l 0)) acc))))
-
-       (lambda (f l) "A classic higher order map over a list."
-	 (map-rec f l '()))))
-
-
 (define filter
-  (let filter-rec
-    (lambda (f l acc)
-      (if (empty-list? l) acc
-	  (let hd (nth l 0)
-	       (filter-rec f (tail l)
-			   (if (f hd) (append hd acc) acc)))))
-
-    (lambda (f l) "A classic higher order filter over a list."
-      (filter-rec f l '()))))
-
+    (lambda (f l) "Filter HOF"
+      (fold (lambda (x acc) (if (f x) (append x acc) acc)) '() l)))
 
 (define length 
-    (let length-tailrec
-      (lambda (l sum)
-	(if (empty-list? l) sum
-	    (length-tailrec (tail l) (+ sum 1))))
-      
-      (lambda (l) "Length of a list." (length-tailrec l 0))))
+    (lambda (l) "List length"
+      (fold (lambda (_ acc) (++ acc)) 0 l)))
 
+;; (let start (time) (begin (E) (print (- (time) start))))
 
 ;; Reverse a list
 (define reverse
-  (let reverse-rec (lambda (l acc)
-		     (if (empty-list? l) acc
-			 (reverse-rec (tail l) (cons (head l) acc))))
+    (lambda (l) "Reverse a list"
+      (fold (lambda (x acc) (cons x acc)) '() l)))
 
-       (lambda (l) "Reverses a list."
-	 (reverse-rec l '()))))
-      
-    
+;; (define ex (repeat-until *2 "x" (lambda (acc) (> (length acc) 800))))
+
 ;; nth element of a list
-(define nth
-  (lambda (l n) "Returns nth element of a list." 
-    (cond ((empty-list? l) 'err-empty-list)
-          ((= n 0) (head l))
-          (t (nth (tail l) (- n 1))))))
+;; (define nth
+;;   (lambda (l n) "Returns nth element of a list." 
+;;     (cond ((empty-list? l) 'err-empty-list)
+;;           ((= n 0) (head l))
+;;           (t (nth (tail l) (- n 1))))))
 
 
 ;; last element of a list
@@ -59,16 +35,27 @@
     (nth l (- (length l) 1))))
 
 
+;; Seq from to
+(define seq
+  (lambda (start end) "List of numbers from start to end"
+    (if (> start end) '() 
+	(reverse
+	 (repeat-until (lambda (acc) (cons (++ (head acc)) acc))
+		       (list start)
+		       (lambda (acc) (= (head acc) (- end 1))))))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Ritorna una lista dei primi n numeri di Fibonacci
+;; Ritorna una lista dei primi n numeri di Lucas
 
 (define lucas-list
-  (lambda (n memo)
-    (if (> n (length memo))
-	(lucas-list n 
-                    (cons (+ (nth memo 0) (nth memo 1)) memo))
-	memo)))
-
+  (lambda (n start)
+    (cond ((< n 0) '())
+	  ((< n 2) (nth start n))
+	  (t (fold (lambda (x acc)
+	             (cons (+ (nth acc 0) (nth acc 1)) acc))
+		   start
+		   (seq 2 n))))))
 
 (define lucas
    (lambda (n memo) "Generates the nth Lucas number, given a starting list."
@@ -79,15 +66,7 @@
   (lambda (n) "Generates the nth fibonacci number."
      (lucas n '(1 1))))
 
-
-;; Seq from to
-(define seq
-  (let seq-rec
-    (lambda (start end acc)
-      (if (>= start end) acc
-          (seq-rec (+ 1 start) end (append start acc))))
-    (lambda (start end) (seq-rec start end ()))))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define zip 
  (let zip-rec 
@@ -163,6 +142,10 @@
 ;; (metacircular (list if-macro-checker for-macro-sub))
 
 ;;;;;;;;;;;;
+
+(define import
+    (lambda (fpath)
+      (evalS (read-file fpath))))
 
 (define loop
   (lambda (f)
